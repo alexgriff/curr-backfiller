@@ -5,8 +5,11 @@ import os
 import subprocess
 from git import Repo, GitCommandError
 
-solution_tag = "__SOLUTION__"
-curriculum_branch = "curriculum-team"
+# CONSTANTS
+SOLUTION_TAG = "__SOLUTION__"
+CURRICULUM_BRANCH = "curriculum-team"
+
+# CHANGE THESE
 owner="alexgriff"
 path_to_labs = os.path.join(os.path.realpath(".."), "labs")
 
@@ -31,7 +34,7 @@ def get_notebook_contents(lab, branch="master"):
 
 
 def tag_cell(cell):
-    source = [f"# {solution_tag} \n"] + cell["source"]
+    source = [f"# {SOLUTION_TAG} \n"] + cell["source"]
     cell.update({"source": source})
 
     return cell
@@ -49,7 +52,10 @@ def merge_cells(master_cells = [], sol_cells = []):
 
     return cells
 
+
+
 # RUN
+# ============================
 
 labs = os.listdir(path_to_labs)
 
@@ -65,9 +71,9 @@ for lab in labs:
 
     # switch to curriculum branch if exists or create new branch
     try:
-        git.checkout(curriculum_branch)
+        git.checkout(CURRICULUM_BRANCH)
     except GitCommandError:
-        git.checkout("HEAD", b=curriculum_branch)
+        git.checkout("HEAD", b=CURRICULUM_BRANCH)
 
     # write index.ipynb
     f = open(f"{cwd}/index.ipynb", "w")
@@ -87,8 +93,8 @@ for lab in labs:
     except GitCommandError:
         print("Nothing to commit")
 
-    print(f"pushing to remote {curriculum_branch} branch for {lab}")
-    repo.git.push("origin", curriculum_branch)
+    print(f"pushing to remote {CURRICULUM_BRANCH} branch for {lab}")
+    repo.git.push("origin", CURRICULUM_BRANCH)
 
     # clean up
     git.checkout("master")
