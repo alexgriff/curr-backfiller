@@ -10,8 +10,8 @@ SOLUTION_TAG = "__SOLUTION__"
 CURRICULUM_BRANCH = "curriculum-team"
 
 # CHANGE THESE
-owner="alexgriff" # github org or username
-path_to_labs = os.path.join(os.path.realpath(".."), "labs") # path to lesson repos
+owner="learn-co-curriculum" # github org or username
+path_to_labs = os.path.join(os.path.realpath(".."), "learn-co-curric-labs") # path to lesson repos
 oauth_token = os.environ['OAUTH_TOKEN'] # github oauth token value
 
 # FUNCTIONS
