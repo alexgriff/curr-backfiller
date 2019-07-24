@@ -1,15 +1,14 @@
 import requests
 import base64
 import json
+import os
+import subprocess
+from git import Repo, GitCommandError
 
 solution_tag = "__SOLUTION__"
-
-labs = [
- "dsc-intro-to-sets-lab",
- "dsc-permutations-and-factorials-lab",
- "dsc-intro-to-probability-lab",
- "dsc-combinations-lab"
-]
+curriculum_branch = "curriculum-team"
+owner="alexgriff"
+path_to_labs = os.path.join(os.path.realpath(".."), "labs")
 
 # FUNCTIONS
 def create_merged_notebook(lab):
@@ -20,12 +19,13 @@ def create_merged_notebook(lab):
 
     master_content.update({"cells": cells})
 
-    f = open(f"{lab}.ipynb", "w")
-    f.write(json.dumps(master_content))
-    f.close()
+    return json.dumps(master_content)
+    # f = open(f"{lab}.ipynb", "w")
+    # f.write(json.dumps(master_content))
+    # f.close()
 
 def get_notebook_contents(lab, branch="master"):
-    response = requests.get(f"http://api.github.com/repos/alexgriff/{lab}/contents/index.ipynb?ref={branch}")
+    response = requests.get(f"http://api.github.com/repos/{owner}/{lab}/contents/index.ipynb?ref={branch}")
     encoded_content = json.loads(response.content)['content']
     return json.loads(base64.b64decode(encoded_content))
 
@@ -51,5 +51,45 @@ def merge_cells(master_cells = [], sol_cells = []):
 
 # RUN
 
+labs = os.listdir(path_to_labs)
+
 for lab in labs:
-    create_merged_notebook(lab)
+    # create new json
+    merged_nb_json = create_merged_notebook(lab)
+
+    # cd into repo
+    os.chdir(f"{path_to_labs}/{lab}")
+    cwd = os.getcwd()
+    repo = Repo(cwd)
+    git = repo.git
+
+    # switch to curriculum branch if exists or create new branch
+    try:
+        git.checkout(curriculum_branch)
+    except GitCommandError:
+        git.checkout("HEAD", b=curriculum_branch)
+
+    # write index.ipynb
+    f = open(f"{cwd}/index.ipynb", "w")
+    f.write(merged_nb_json)
+    f.close()
+
+    # generate markdown
+    subprocess.call(["jupyter", "nbconvert", "index.ipynb",  "--to", "markdown"])
+    subprocess.call(["mv", "index.md", "README.md"])
+
+
+    # add, commit, push
+    git.add(".")
+    try:
+        git.commit("-m", "AUTO: Create curriculum-team branch")
+        print(f"Added Commit: {repo.commit()}")
+    except GitCommandError:
+        print("Nothing to commit")
+
+    print(f"pushing to remote {curriculum_branch} branch for {lab}")
+    repo.git.push("origin", curriculum_branch)
+
+    # clean up
+    git.checkout("master")
+    os.chdir(os.getcwd())
