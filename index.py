@@ -7,11 +7,11 @@ from git import Repo, Git, GitCommandError
 
 # CONSTANTS
 SOLUTION_TAG = "__SOLUTION__"
-CURRICULUM_BRANCH = "curriculum-team"
+CURRICULUM_BRANCH = "curriculum"
 
 # CHANGE THESE
-owner="learn-co-curriculum" # github org or username
-path_to_labs = os.path.join(os.path.realpath(".."), "learn-co-curric-labs") # path to lesson repos
+owner= "learn-co-curriculum" # github org or username
+path_to_labs = os.path.join(os.path.realpath(".."), "test-repos") # path to lesson repos
 oauth_token = os.environ['OAUTH_TOKEN'] # github oauth token value
 
 # FUNCTIONS
@@ -35,6 +35,8 @@ def get_notebook_contents(lab, branch="master"):
         encoded_content = json.loads(response.content)['content']
         return json.loads(base64.b64decode(encoded_content))
     else:
+        print("BAD API RESPONSE:")
+        print(f"{response.content}\n")
         return None
 
 
