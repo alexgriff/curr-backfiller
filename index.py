@@ -8,7 +8,7 @@ from git import Repo, Git, GitCommandError
 # CONSTANTS
 SOLUTION_TAG = "__SOLUTION__"
 CURRICULUM_BRANCH = "curriculum"
-UNSYNCED_COMMIT_MSG = f" ALERT: Cell Length Mismatch. Auto-create #{CURRICULUM_BRANCH} branch from solution + master"
+UNSYNCED_COMMIT_MSG = f" ALERT: Cell Mismatch. Auto-create #{CURRICULUM_BRANCH} branch from solution + master"
 SYNCED_COMMIT_MSG = f"Auto-create {CURRICULUM_BRANCH} branch from master + solution"
 LESSON_COMMIT_MSG = f"Auto-create {CURRICULUM_BRANCH} branch from master"
 
@@ -29,11 +29,11 @@ def create_merged_notebook(lab):
     sol_cells = get_cells(sol_content)
 
     if is_synced_lab(master_cells, sol_cells):
-        cells = merge_cells_synced(master_cells=master_cells, sol_cells=sol_cells)
         commit_msg = SYNCED_COMMIT_MSG
+        cells = merge_cells_synced(master_cells=master_cells, sol_cells=sol_cells)
     else:
+        commit_msg = UNSYNCED_COMMIT_MSG if len(sol_cells) > 0 else LESSON_COMMIT_MSG
         cells = merge_cells_unsynced(master_cells=master_cells, sol_cells=sol_cells)
-        commit_msg = UNSYNCED_COMMIT_MSG if len(sol_cells) else LESSON_COMMIT_MSG
 
 
     master_content.update({"cells": cells})
@@ -163,7 +163,7 @@ for lab in labs:
     git = repo.git
 
     if commit_msg == UNSYNCED_COMMIT_MSG:
-        mismatches.push(repo.remotes.origin.url)
+        mismatches.append(repo.remotes.origin.url)
 
     # switch to curriculum branch if exists or create new branch
     try:
@@ -180,9 +180,8 @@ for lab in labs:
     subprocess.call(["jupyter", "nbconvert", "index.ipynb",  "--to", "markdown"])
     subprocess.call(["mv", "index.md", "README.md"])
 
-
     # add, commit, push
-    git.add(".")
+    git.add(os.path.realpath("."))
     try:
         git.commit("-m", commit_msg)
         print(f"Added Commit: {repo.commit()}")
@@ -197,7 +196,7 @@ for lab in labs:
     os.chdir(old_cwd)
 
 # Log mismatches
-# print(mismatches)
-# f = open("somethings_up_logs.json", "w")
-# f.write(json.dumps(mismatches))
-# f.close()
+print(mismatches)
+f = open("somethings_up_logs.json", "w")
+f.write(json.dumps(mismatches))
+f.close()
