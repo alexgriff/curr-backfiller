@@ -9,13 +9,14 @@ from git import Repo, Git, GitCommandError
 SOLUTION_TAG = "__SOLUTION__"
 CURRICULUM_BRANCH = "curriculum"
 UNSYNCED_COMMIT_MSG = f" ALERT: Cell Length Mismatch. Auto-create #{CURRICULUM_BRANCH} branch from solution + master"
-SYNCED_COMMIT_MSG = f"Auto-create {CURRICULUM_BRANCH} branch from solution + master"
+SYNCED_COMMIT_MSG = f"Auto-create {CURRICULUM_BRANCH} branch from master + solution"
 LESSON_COMMIT_MSG = f"Auto-create {CURRICULUM_BRANCH} branch from master"
 
 # CHANGE THESE
 owner= "learn-co-curriculum" # github org or username
 path_to_labs = os.path.join(os.path.realpath(".."), "stress_test") # path to lesson repos
-# oauth_token = os.environ['OAUTH_TOKEN'] # github oauth token value
+oauth_token = os.environ['OAUTH_TOKEN'] # github oauth token value
+
 
 
 # FUNCTIONS
@@ -27,19 +28,12 @@ def create_merged_notebook(lab):
     master_cells = get_cells(master_content)
     sol_cells = get_cells(sol_content)
 
-    # If it's not a lab
-    if sol_content == None:
-        cells = master_cells
-        commit_msg = LESSON_COMMIT_MSG
+    if is_synced_lab(master_cells, sol_cells):
+        cells = merge_cells_synced(master_cells=master_cells, sol_cells=sol_cells)
+        commit_msg = SYNCED_COMMIT_MSG
     else:
-        # otherwise, for labs
-        # 'synced' = same number of md cells
-        if is_synced_lab(master_cells, sol_cells):
-            cells = merge_cells_synced(master_cells=master_cells, sol_cells=sol_cells)
-            commit_msg = SYNCED_COMMIT_MSG
-        else:
-            cells = merge_cells_unsynced(master_cells=master_cells, sol_cells=sol_cells)
-            commit_msg = UNSYNCED_COMMIT_MSG
+        cells = merge_cells_unsynced(master_cells=master_cells, sol_cells=sol_cells)
+        commit_msg = UNSYNCED_COMMIT_MSG if len(sol_cells) else LESSON_COMMIT_MSG
 
 
     master_content.update({"cells": cells})
