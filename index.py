@@ -5,6 +5,7 @@ import os
 import subprocess
 from git import Repo, Git, GitCommandError
 
+
 # CONSTANTS
 SOLUTION_TAG = "__SOLUTION__"
 CURRICULUM_BRANCH = "curriculum"
@@ -14,9 +15,8 @@ LESSON_COMMIT_MSG = f"Auto-create {CURRICULUM_BRANCH} branch from master"
 
 # CHANGE THESE
 owner= "learn-co-curriculum" # github org or username
-path_to_labs = os.path.join(os.path.realpath(".."), "first-15-lessons") # path to lesson repos
-oauth_token = os.environ['OAUTH_TOKEN'] # github oauth token value
-
+path_to_labs = os.path.join(os.path.realpath(".."), "objattr") # path to lesson repos
+# oauth_token = os.environ['OAUTH_TOKEN'] # github oauth token value
 
 
 # FUNCTIONS
@@ -36,7 +36,7 @@ def create_merged_notebook(lab):
         commit_msg = SYNCED_COMMIT_MSG
         cells = merge_cells_synced(master_cells=master_cells, sol_cells=sol_cells)
     else:
-        log_lesson(master_cells, sol_cells)
+        log_lesson(lab, master_cells, sol_cells)
         commit_msg = UNSYNCED_COMMIT_MSG if len(sol_cells) > 0 else LESSON_COMMIT_MSG
         cells = merge_cells_unsynced(master_cells=master_cells, sol_cells=sol_cells)
 
@@ -141,21 +141,24 @@ def merge_cells_synced(master_cells = [], sol_cells = []):
     return cells
 
 
-def log_lesson(master_cells, sol_cells):
-    log = open("logs.txt", "a")
-    m_md = ["\n".join(cell["source"] for cell in master_cells if is_markdown(cell)]
-    s_md = ["\n".join(cell["source"] for cell in sol_cells if is_markdown(cell)]
+def log_lesson(lab, master_cells, sol_cells):
+    if len(sol_cells):
+        log = open("logs.txt", "a")
+        m_md = ["\n".join(cell["source"]) for cell in master_cells if is_markdown(cell)]
+        s_md = ["\n".join(cell["source"]) for cell in sol_cells if is_markdown(cell)]
 
-    diff = list(set(m) - set(s))
-    formatted_diff = [f"{url}: {tag_branch(cell, m, s)}: {cell[0:25]}" for cell in diff]
+        diff = list(set(m_md) - set(s_md))
 
-    if len(diff):
-        for l in formatted_diff:
-            log.write(l)
-    else:
-        log.write(f"{url}: MASTER/SOL length mismatch")
+        new_line = "\n"
+        formatted_diff = [f"{lab}: {cell[0:25].replace(new_line,'')}{new_line}" for cell in diff]
 
-    log.close()
+        if len(formatted_diff):
+            for l in formatted_diff:
+                log.write(l)
+        else:
+            log.write(f"{lab}: MASTER/SOL length mismatch{new_line}")
+
+        log.close()
 
 # RUN
 # =========
@@ -168,7 +171,6 @@ old_cwd = os.getcwd()
 
 
 labs = os.listdir(path_to_labs)
-mismatches = []
 
 
 for lab in labs:
@@ -181,10 +183,6 @@ for lab in labs:
         cwd = os.getcwd()
         repo = Repo(cwd)
         git = repo.git
-
-        if commit_msg == UNSYNCED_COMMIT_MSG:
-            mismatches.append(repo.remotes.origin.url)
-
         # switch to curriculum branch if exists or create new branch
         try:
             git.checkout(CURRICULUM_BRANCH)
