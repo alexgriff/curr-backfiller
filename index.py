@@ -8,13 +8,13 @@ from git import Repo, Git, GitCommandError
 # CONSTANTS
 SOLUTION_TAG = "__SOLUTION__"
 CURRICULUM_BRANCH = "curriculum"
-UNSYNCED_COMMIT_MSG = f" ALERT: Cell Mismatch. Auto-create #{CURRICULUM_BRANCH} branch from solution + master"
+UNSYNCED_COMMIT_MSG = f" ALERT: Cell Mismatch. Auto-create {CURRICULUM_BRANCH} branch from solution + master"
 SYNCED_COMMIT_MSG = f"Auto-create {CURRICULUM_BRANCH} branch from master + solution"
 LESSON_COMMIT_MSG = f"Auto-create {CURRICULUM_BRANCH} branch from master"
 
 # CHANGE THESE
 owner= "learn-co-curriculum" # github org or username
-path_to_labs = os.path.join(os.path.realpath(".."), "stress_test") # path to lesson repos
+path_to_labs = os.path.join(os.path.realpath(".."), "first-15-lessons") # path to lesson repos
 oauth_token = os.environ['OAUTH_TOKEN'] # github oauth token value
 
 
@@ -23,15 +23,20 @@ oauth_token = os.environ['OAUTH_TOKEN'] # github oauth token value
 # =========
 
 def create_merged_notebook(lab):
+    # strip leading numbers
+    lab = lab[4:]
     master_content = get_notebook_contents(lab)
     sol_content = get_notebook_contents(lab, branch="solution")
     master_cells = get_cells(master_content)
     sol_cells = get_cells(sol_content)
 
+    if len(master_cells) == 0: return (None, None)
+
     if is_synced_lab(master_cells, sol_cells):
         commit_msg = SYNCED_COMMIT_MSG
         cells = merge_cells_synced(master_cells=master_cells, sol_cells=sol_cells)
     else:
+        log_lesson(master_cells, sol_cells)
         commit_msg = UNSYNCED_COMMIT_MSG if len(sol_cells) > 0 else LESSON_COMMIT_MSG
         cells = merge_cells_unsynced(master_cells=master_cells, sol_cells=sol_cells)
 
@@ -40,6 +45,7 @@ def create_merged_notebook(lab):
     return (json.dumps(master_content), commit_msg)
 
 def get_notebook_contents(lab, branch="master"):
+    print(lab)
     headers = {"Authorization": f"token {oauth_token}"}
     response = requests.get(f"http://api.github.com/repos/{owner}/{lab}/contents/index.ipynb?ref={branch}", headers=headers)
 
@@ -135,8 +141,21 @@ def merge_cells_synced(master_cells = [], sol_cells = []):
     return cells
 
 
+def log_lesson(master_cells, sol_cells):
+    log = open("logs.txt", "a")
+    m_md = ["\n".join(cell["source"] for cell in master_cells if is_markdown(cell)]
+    s_md = ["\n".join(cell["source"] for cell in sol_cells if is_markdown(cell)]
 
+    diff = list(set(m) - set(s))
+    formatted_diff = [f"{url}: {tag_branch(cell, m, s)}: {cell[0:25]}" for cell in diff]
 
+    if len(diff):
+        for l in formatted_diff:
+            log.write(l)
+    else:
+        log.write(f"{url}: MASTER/SOL length mismatch")
+
+    log.close()
 
 # RUN
 # =========
@@ -151,52 +170,47 @@ old_cwd = os.getcwd()
 labs = os.listdir(path_to_labs)
 mismatches = []
 
+
 for lab in labs:
     # create new json
     merged_nb_json, commit_msg = create_merged_notebook(lab)
 
+    if merged_nb_json:
+        # cd into repo
+        os.chdir(f"{path_to_labs}/{lab}")
+        cwd = os.getcwd()
+        repo = Repo(cwd)
+        git = repo.git
 
-    # cd into repo
-    os.chdir(f"{path_to_labs}/{lab}")
-    cwd = os.getcwd()
-    repo = Repo(cwd)
-    git = repo.git
+        if commit_msg == UNSYNCED_COMMIT_MSG:
+            mismatches.append(repo.remotes.origin.url)
 
-    if commit_msg == UNSYNCED_COMMIT_MSG:
-        mismatches.append(repo.remotes.origin.url)
+        # switch to curriculum branch if exists or create new branch
+        try:
+            git.checkout(CURRICULUM_BRANCH)
+        except GitCommandError:
+            git.checkout("HEAD", b=CURRICULUM_BRANCH)
 
-    # switch to curriculum branch if exists or create new branch
-    try:
-        git.checkout(CURRICULUM_BRANCH)
-    except GitCommandError:
-        git.checkout("HEAD", b=CURRICULUM_BRANCH)
+        # write index.ipynb
+        f = open(f"{cwd}/index.ipynb", "w")
+        f.write(merged_nb_json)
+        f.close()
 
-    # write index.ipynb
-    f = open(f"{cwd}/index.ipynb", "w")
-    f.write(merged_nb_json)
-    f.close()
+        # generate markdown
+        subprocess.call(["jupyter", "nbconvert", "index.ipynb",  "--to", "markdown"])
+        subprocess.call(["mv", "index.md", "README.md"])
 
-    # generate markdown
-    subprocess.call(["jupyter", "nbconvert", "index.ipynb",  "--to", "markdown"])
-    subprocess.call(["mv", "index.md", "README.md"])
+        # add, commit, push
+        git.add(os.path.realpath("."))
+        try:
+            git.commit("-m", commit_msg)
+            print(f"Added Commit: {repo.commit()}")
+        except GitCommandError:
+            print("Nothing to commit")
 
-    # add, commit, push
-    git.add(os.path.realpath("."))
-    try:
-        git.commit("-m", commit_msg)
-        print(f"Added Commit: {repo.commit()}")
-    except GitCommandError:
-        print("Nothing to commit")
+        print(f"pushing to remote {CURRICULUM_BRANCH} branch for {lab}")
+        repo.git.push("origin", CURRICULUM_BRANCH)
 
-    print(f"pushing to remote {CURRICULUM_BRANCH} branch for {lab}")
-    repo.git.push("origin", CURRICULUM_BRANCH)
-
-    # clean up
-    git.checkout("master")
-    os.chdir(old_cwd)
-
-# Log mismatches
-print(mismatches)
-f = open("somethings_up_logs.json", "w")
-f.write(json.dumps(mismatches))
-f.close()
+        # clean up
+        git.checkout("master")
+        os.chdir(old_cwd)
